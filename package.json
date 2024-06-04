@@ -1,5 +1,5 @@
 {
-  "name": "fks-poc",
+  "name": "permissions-visualizer",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,9 +8,13 @@
   },
   "keywords": [],
   "author": "",
+  "publishConfig": {
+    "registry": "https://registry.your-registry.com"
+  },
   "license": "ISC",
   "dependencies": {
     "blessed": "^0.1.81",
+    "dotenv": "^16.4.5",
     "pg": "^8.11.5"
   }
 }

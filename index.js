@@ -1,3 +1,4 @@
+require('dotenv').config()
 const { Client } = require('pg');
 
 const TAB_CHAR = '  '
@@ -9,18 +10,34 @@ const BOTTOM_BRANCH_CHAR = '└─'
 const HORIZONTAL_BRANCH_CHAR = '─'
 const RIGHT_TOP_BRANCH_CHAR = '┐'
 
-const client = new Client({
-    user: 'runbotics',
-    host: '127.0.0.1',
-    database: 'runbotics',
-    password: '',
-    port: 5432
-});
+const clients = {
+    local: {
+        user: process.env.LOCAL_DB_USER,
+        host: process.env.LOCAL_DB_HOST,
+        database: process.env.LOCAL_DB_NAME,
+        password: process.env.LOCAL_DB_PASSWORD,
+        port: process.env.LOCAL_DB_PORT
+    },
+    dev: {
+        user: process.env.DEV_DB_USER,
+        host: process.env.DEV_DB_HOST,
+        database: process.env.DEV_DB_NAME,
+        password: process.env.DEV_DB_PASSWORD,
+        port: process.env.DEV_DB_PORT
+    },
+}
 
-async function getAuthorityFeatureKey() {
-    await client.connect();
+const getConnectedClient = (server) => {
+    if (!server) {
+        console.log('Server is not provided. Avaiable servers are: ', Object.keys(clients).join(', '))
+    }
+    return new Client(clients[server])
+}
 
+async function getAuthorityFeatureKey(client) {
     // const roles = await client.query('SELECT name FROM jhi_authority').then(res => res.rows.map(row => row.name))
+
+    await client.connect();
 
     const authorityFeatureKey = await client
         .query('SELECT authority, feature_key FROM authority_feature_key')
@@ -46,10 +63,6 @@ const checkIsSubset = (a, b) => {
 const displayDiff = (treeNodes) => {
     treeNodes.forEach((treeNode, idx) => {
         if (idx === treeNodes.length - 1) return;
-        // console.log(treeNode.authority + ' - ' + treeNodes[idx + 1]?.authority + ':')
-        // console.log('')
-        // console.log(getSetsDiff(treeNode.fks, treeNodes[idx + 1]?.fks).map(fk => TAB_CHAR.repeat(2) + fk).join('\n'))
-        // console.log('')
         console.log(treeNodes[idx + 1]?.authority + ' - ' + treeNode.authority + ':')
         console.log(getSetsDiff(treeNodes[idx + 1]?.fks, treeNode.fks).map(fk => fk))
         console.log('')
@@ -75,7 +88,6 @@ const drawChildTree = (treeNode, level, all) => {
     }
     if (treeNode.subsets) {
         treeNode.subsets.forEach((subset) => {
-            // console.log("CHILDREN IS BEING DRAWN:")
             drawChildTree(all.find(
                 node => node.authority === subset
             ), level + 2, all)
@@ -88,7 +100,10 @@ const getSetsDiff = (aKeys, bKeys) => {
 }
 
 const main = async () => {
-    const authorityFeatureKey = await getAuthorityFeatureKey()
+    const target = process.argv.includes('-t') ? process.argv[process.argv.indexOf('-t') + 1] : 'local'
+    const client = getConnectedClient(target)
+
+    const authorityFeatureKey = await getAuthorityFeatureKey(client)
         .then(res => Object.fromEntries(
             Object.entries(res).map(([key, value]) => [key, [...value].sort()])
         ))
@@ -116,8 +131,6 @@ const main = async () => {
         }
     })
 
-    // const subsetsByAuthority = fksByAuthority.map(fk => ({ authority: fk.authority, subsets: fk.subsets }));
-
     const onlyNotContainedInOwn = fksByAuthority.map(({ subsets, authority, newFks, fks }) => {
         const currentRowSubsets = [...subsets]
         const isOtherRowSubset = (subset) => fksByAuthority.some(sba => sba.subsets.includes(subset) && sba.authority !== authority && currentRowSubsets.includes(sba.authority))
@@ -136,8 +149,9 @@ const main = async () => {
 
     drawChildTree(onlyNotContainedInOwn.find(set => set.authority === 'ROLE_ADMIN'), 0, onlyNotContainedInOwn)
 
-    // displayDiff(sortByMasterSet)
+    if (process.argv.includes('--showDiff')) {
+        displayDiff(onlyNotContainedInOwn)
+    }
 }
 
-main();
-
+main()
