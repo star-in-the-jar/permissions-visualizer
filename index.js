@@ -147,10 +147,31 @@ const main = async () => {
         })
     })
 
+    if (process.argv.includes('--showObj')) {
+        console.log(fksByAuthority)
+        return
+    }
+
     drawChildTree(onlyNotContainedInOwn.find(set => set.authority === 'ROLE_ADMIN'), 0, onlyNotContainedInOwn)
 
     if (process.argv.includes('--showDiff')) {
         displayDiff(onlyNotContainedInOwn)
+    }
+
+    if (process.argv.includes('--showQueries')) {
+        console.log('Queries you can try yourself:')
+
+        for (roleIdx in roles) {
+            for (nextRoleIdx in roles) {
+                const role = roles[roleIdx]
+                const nextRole = roles[parseInt(nextRoleIdx)]
+                if (!role || !nextRole) continue;
+                if (role === nextRole) continue;
+                // console.log(`What FKs does ${role} has that ${nextRole} does not have?`)
+                console.log('\x1b[32m%s\x1b[0m - \x1b[32m%s\x1b[0m:', role.slice(5), nextRole.slice(5));
+                console.log('\x1b[90m%s\x1b[0m', `SELECT feature_key from authority_feature_key where authority = '${role}' EXCEPT SELECT feature_key from authority_feature_key where authority = '${nextRole}'`)
+            }
+        }
     }
 }
 
